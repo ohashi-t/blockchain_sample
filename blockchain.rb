@@ -1,25 +1,25 @@
-require './block'
-require './transaction'
-require 'pry'
-
 class Blockchain
-  MINING_DIFFICULTY = 3
-  attr_accessor :chain, :transaction_pool
+  require './block'
+  require './transaction'
 
-  def initialize
+  attr_accessor :chain, :transaction_pool, :blockchain_address
+
+  def initialize(blockchain_address)
     @chain = []
     @transaction_pool = []
+    # 誰がマイニングしたか
+    @blockchain_address = blockchain_address
   end
 
-  def self.new_blockchain
+  def self.new_blockchain(blockchain_address)
     b = Block.new(0, "Init hash", [])
-    bc = self.new
+    bc = self.new(blockchain_address)
     bc.create_block(0, b.hashed)
     bc
   end
 
   def create_block(nonce, previous_hash)
-    b = ::Block.new(nonce, previous_hash, self.transaction_pool)
+    b = Block.new(nonce, previous_hash, self.transaction_pool)
     self.chain << b
     self.transaction_pool.clear
   end
@@ -40,14 +40,35 @@ class Blockchain
     transactions = self.transaction_pool
     previous_hash = self.chain.last.hashed
     nonce = 0
-    until valid_proof(nonce, previous_hash, transactions, MINING_DIFFICULTY)
+    until self.valid_proof(nonce, previous_hash, transactions, MINING_DIFFICULTY)
       nonce += 1
     end
     nonce
   end
 
+  def mining
+    self.add_transaction(MINING_SENDER, self.blockchain_address, MINING_REWARD)
+    nonce = self.proof_of_work
+    previous_hash = self.chain.last.hashed
+    self.create_block(nonce, previous_hash)
+    p "action=mining, status=success"
+    true
+  end
+
+  def calculate_total_amount(bc_address)
+    total_amount = 0.0
+    self.chain.each do |block|
+      block.transactions.each do |t|
+        value = t.value
+        total_amount += value if bc_address == t.recipient_blockchain_address
+        total_amount -= value if bc_address == t.sender_blockchain_address
+      end
+    end
+    total_amount
+  end
+
   def copy_transaction_pool
-    @transaction_pool.dup.map(&:dup)
+    self.transaction_pool.dup.map(&:dup)
   end
 
   def print_on
@@ -59,16 +80,28 @@ class Blockchain
   end
 
 end
-bc = Blockchain.new_blockchain
+
+
+# MAIN
+
+MINING_DIFFICULTY = 3
+MINING_SENDER = "THE BLOCKCHAIN"
+MINING_REWARD = 1.0
+
+my_blockchain_address = "my_blockchain_address"
+
+bc = Blockchain.new_blockchain(my_blockchain_address)
 bc.print_on
 
 bc.add_transaction("A", "B",1.0)
-
-bc.create_block(bc.proof_of_work, bc.chain.last.hashed)
-# binding.pry
+bc.mining
 bc.print_on
 
 bc.add_transaction("C", "D", 2.0)
 bc.add_transaction("X", "Y", 3.0)
-bc.create_block(bc.proof_of_work, bc.chain.last.hashed)
+bc.mining
 bc.print_on
+
+p "my: #{bc.calculate_total_amount("my_blockchain_address")}"
+p "C: #{bc.calculate_total_amount("C")}"
+p "D: #{bc.calculate_total_amount("D")}"
