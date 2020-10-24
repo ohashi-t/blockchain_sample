@@ -24,9 +24,29 @@ class Blockchain
     self.transaction_pool.clear
   end
 
-  def add_transaction(sender, recipient, value)
-    t = Transaction.new(sender, recipient, value)
-    self.transaction_pool << t
+  def add_transaction(sender, recipient, value, sender_public_key = nil, signature = nil)
+    t = B::Transaction.new(sender, recipient, value)
+
+    if sender == MINING_SENDER
+      self.transaction_pool << t
+      return true
+    end
+    if self.verify_transaction_signature(sender_public_key, signature, t.make_json)
+      # デモなのでコメントアウト
+      # if self.calculate_total_amount(sender) < value
+      #   p "ERROR: Not enough balance in a wallet!!!!"
+      #   return false
+      # end
+      self.transaction_pool << t
+      return true
+    else
+      p "ERROR: Verify Transaction!!!!"
+    end
+    return false
+  end
+
+  def verify_transaction_signature(sender_public_key, signature, transaction)
+    sender_public_key.verify("sha256", signature, transaction)
   end
 
   def valid_proof(nonce, previous_hash, transactions, difficulty)
