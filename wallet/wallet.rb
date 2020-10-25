@@ -33,17 +33,16 @@ class Wallet
     public_key.to_s
   end
 
+  def private_str
+    private_key.to_s
+  end
+
   class << self
     def generate_private_key
       OpenSSL::Random.seed(File.read("/dev/random", 16))
       OpenSSL::PKey::RSA.generate(2048)
     end
   end
-
-  private
-    def private_str
-      private_key.to_s
-    end
 end
 
 w = Wallet.new

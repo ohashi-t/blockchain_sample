@@ -1,19 +1,22 @@
+require 'pry'
+
 class Blockchain
   require_relative 'block'
   require_relative 'transaction'
 
   attr_accessor :chain, :transaction_pool, :blockchain_address
 
-  def initialize(blockchain_address)
+  def initialize(blockchain_address, port)
     @chain = []
     @transaction_pool = []
     # 誰がマイニングしたか
     @blockchain_address = blockchain_address
+    @port = port
   end
 
-  def self.new_blockchain(blockchain_address)
+  def self.new_blockchain(blockchain_address, port)
     b = Block.new(0, "Init hash", [])
-    bc = self.new(blockchain_address)
+    bc = self.new(blockchain_address, port)
     bc.create_block(0, b.hashed)
     bc
   end
@@ -97,6 +100,20 @@ class Blockchain
       c.print_on
     end
     p "*" * 25
+  end
+
+  def get_chain_json
+    chain_json = []
+    self.chain.each do |block|
+      chain_json << {
+                      nonce: block.nonce,
+                      previous_hash: block.previous_hash,
+                      transactions: block.transactions,
+                      timestamp: block.timestamp
+                    }.
+                    to_json
+    end
+    chain_json
   end
 
 end
