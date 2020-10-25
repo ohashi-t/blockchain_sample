@@ -37,6 +37,15 @@ class Wallet
     private_key.to_s
   end
 
+  def attr_json
+    {
+      private_key: self.private_key,
+      public_key: self.public_key,
+      blockchain_address: self.blockchain_address
+    }.
+    to_json
+  end
+
   class << self
     def generate_private_key
       OpenSSL::Random.seed(File.read("/dev/random", 16))
