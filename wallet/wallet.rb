@@ -32,7 +32,7 @@ class Wallet
   end
 
   def public_str
-    public_key.to_s
+    Base64.encode64(public_key.to_s)
   end
 
   def private_str

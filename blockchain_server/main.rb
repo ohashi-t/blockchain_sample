@@ -75,4 +75,16 @@ srv.mount_proc("/start") do |req, res|
   end
 end
 
+srv.mount_proc("/amount") do |req, res|
+  case req.request_method
+  when "GET"
+    bc = req.query["blockchain_address"]
+    amount = BlockchainServer.new(ARGV[0]).get_blockchain.total_amount_json(bc)
+    res.body = amount
+    res.content_type = "application/json"
+  else
+    p "ERROR: Invalid HTTP Method!"
+  end
+end
+
 srv.start

@@ -104,7 +104,7 @@ class Blockchain
   end
 
   def start_mining
-    Thread.new(self.mining)
+    Thread.new { self.mining }
     sleep 20
     start_mining
   end
@@ -113,12 +113,19 @@ class Blockchain
     total_amount = 0.0
     self.chain.each do |block|
       block.transactions.each do |t|
-        value = t.value
+        value = t.value.to_f
         total_amount += value if bc_address == t.recipient_blockchain_address
         total_amount -= value if bc_address == t.sender_blockchain_address
       end
     end
     total_amount
+  end
+
+  def total_amount_json(bc_address)
+    {
+      amount: calculate_total_amount(bc_address)
+    }.
+    to_json
   end
 
   def copy_transaction_pool

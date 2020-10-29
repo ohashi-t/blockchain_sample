@@ -13,7 +13,8 @@ srv = WEBrick::HTTPServer.new(
 )
 
 w = WalletServer.new(ARGV[0], ARGV[1])
-# binding.pry
+
+# "http://#{srv[:BindAddress]}:#{srv[:Port]}"
 
 # srv.mount_proc("/") do |_req, res|
 #   res.body = Slim::Template.new("./templates/index.html.slim").render
@@ -70,6 +71,21 @@ srv.mount_proc("/transaction") do |req, res|
   else
     p "ERROR: Invalid HTTP Method!!!!"
     res.status = 404
+  end
+end
+
+srv.mount_proc("/wallet_amount") do |req, res|
+  case req.request_method
+  when "GET"
+    bc_address = req.query["blockchain_address"].chomp.gsub(/\n/, ' ')
+    response = Faraday.get("http://127.0.0.1:5000/amount", "blockchain_address" => bc_address)
+    if response.success?
+      res.status = 200
+      res.body = response.body
+    else
+      res.status = 404
+      res.body = "failed..."
+    end
   end
 end
 
