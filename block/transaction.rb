@@ -15,6 +15,14 @@ module B
       }.to_json
     end
 
+    def make_hash
+      {
+        sender_blockchain_address: self.sender_blockchain_address,
+        recipient_blockchain_address: self.recipient_blockchain_address,
+        value: self.value,
+      }
+    end
+
     def print_on
       p "-" * 40
       p self.sender_blockchain_address

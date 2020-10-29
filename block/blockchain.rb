@@ -1,10 +1,17 @@
 require 'pry'
+require 'base64'
+require 'openssl'
+include OpenSSL::PKey
 
 class Blockchain
   require_relative 'block'
   require_relative 'transaction'
 
-  attr_accessor :chain, :transaction_pool, :blockchain_address
+  attr_accessor :chain, :transaction_pool, :blockchain_address, :mux
+  MINING_SENDER = "THE BLOCKCHAIN"
+  MINING_REWARD = 1.0
+  MINING_DIFFICULTY = 3
+  MINING_TIMER_SEC = 20
 
   def initialize(blockchain_address, port)
     @chain = []
@@ -12,6 +19,7 @@ class Blockchain
     # 誰がマイニングしたか
     @blockchain_address = blockchain_address
     @port = port
+    @mux = Thread::Mutex.new
   end
 
   def self.new_blockchain(blockchain_address, port)
@@ -25,6 +33,19 @@ class Blockchain
     b = Block.new(nonce, previous_hash, self.transaction_pool)
     self.chain << b
     self.transaction_pool.clear
+  end
+
+  def transaction_json
+    {
+      transactions: self.transaction_pool.map(&:make_hash),
+      length: self.transaction_pool.size
+    }.
+    to_json
+  end
+
+  def create_transaction(sender, recipient, value, sender_public_key, signature)
+    is_transacted = add_transaction(sender, recipient, value, sender_public_key, signature)
+    is_transacted
   end
 
   def add_transaction(sender, recipient, value, sender_public_key = nil, signature = nil)
@@ -49,7 +70,7 @@ class Blockchain
   end
 
   def verify_transaction_signature(sender_public_key, signature, transaction)
-    sender_public_key.verify("sha256", signature, transaction)
+    RSA.new(sender_public_key).verify("sha256", Base64.decode64(signature), transaction)
   end
 
   def valid_proof(nonce, previous_hash, transactions, difficulty)
@@ -70,12 +91,22 @@ class Blockchain
   end
 
   def mining
-    self.add_transaction(MINING_SENDER, self.blockchain_address, MINING_REWARD)
-    nonce = self.proof_of_work
-    previous_hash = self.chain.last.hashed
-    self.create_block(nonce, previous_hash)
-    p "action=mining, status=success"
-    true
+    self.mux.synchronize do
+      return false if self.transaction_pool.empty?
+
+      self.add_transaction(MINING_SENDER, self.blockchain_address, MINING_REWARD)
+      nonce = self.proof_of_work
+      previous_hash = self.chain.last.hashed
+      self.create_block(nonce, previous_hash)
+      p "action=mining, status=success"
+      true
+    end
+  end
+
+  def start_mining
+    Thread.new(self.mining)
+    sleep 20
+    start_mining
   end
 
   def calculate_total_amount(bc_address)

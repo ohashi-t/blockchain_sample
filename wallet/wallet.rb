@@ -20,8 +20,10 @@ class Wallet
   attr_accessor :private_key, :public_key, :blockchain_address
 
   def initialize
-    @private_key = self.class.generate_private_key
-    @public_key = @private_key.public_key
+    rsa = self.generate_private_key
+    # @private_key = rsa.export(OpenSSL::Cipher::Cipher.new('aes256'), 'password')
+    @private_key = rsa
+    @public_key = rsa.public_key
     @blockchain_address = public_str
   end
 
@@ -46,17 +48,16 @@ class Wallet
     to_json
   end
 
-  class << self
-    def generate_private_key
-      OpenSSL::Random.seed(File.read("/dev/random", 16))
-      OpenSSL::PKey::RSA.generate(2048)
-    end
+  def generate_private_key
+    OpenSSL::Random.seed(File.read("/dev/random", 16))
+    OpenSSL::PKey::RSA.generate(2048)
   end
 end
 
-w = Wallet.new
-t = w.new_transaction("B", 1.0)
-p "signature: #{t.generate_signature}"
+# w = Wallet.new
+# t = w.new_transaction("B", 1.0)
+# p "signature: #{t.generate_signature}"
+#
 # w = Wallet.new
 # binding.pry
 # p w
