@@ -12,6 +12,8 @@ srv = WEBrick::HTTPServer.new(
   Port: ARGV[0],
 )
 # binding.pry
+BlockchainServer.new(srv.config[:Port]).get_blockchain.start_sync_neighbors
+
 srv.mount_proc("/") do |req, res|
   BlockchainServer.new(srv.config[:Port]).get_chain(req).each do |block_json|
     res.body << block_json

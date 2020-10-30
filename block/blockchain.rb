@@ -2,16 +2,25 @@ require 'pry'
 require 'base64'
 require 'openssl'
 include OpenSSL::PKey
+require_relative '../utils/neighbor'
 
 class Blockchain
   require_relative 'block'
   require_relative 'transaction'
 
-  attr_accessor :chain, :transaction_pool, :blockchain_address, :mux
+
   MINING_SENDER = "THE BLOCKCHAIN"
   MINING_REWARD = 1.0
   MINING_DIFFICULTY = 3
   MINING_TIMER_SEC = 20
+
+  BLOCKCHAIN_PORT_RANGE_START = 5000
+  BLOCKCHAIN_PORT_RANGE_END = 5003
+  NEIGHBOR_IP_RANGE_START = 0
+  NEIGHBOR_IP_RANGE_END = 1
+  BLOCKCHAIN_NEIGHBOR_SYNC_TIME_SEC = 20
+
+  attr_accessor :chain, :transaction_pool, :blockchain_address, :port, :mux, :neighbors, :mux_neighbors
 
   def initialize(blockchain_address, port)
     @chain = []
@@ -20,6 +29,8 @@ class Blockchain
     @blockchain_address = blockchain_address
     @port = port
     @mux = Thread::Mutex.new
+    @neighbors = []
+    @mux_neighbors = Thread::Mutex.new
   end
 
   def self.new_blockchain(blockchain_address, port)
@@ -27,6 +38,23 @@ class Blockchain
     bc = self.new(blockchain_address, port)
     bc.create_block(0, b.hashed)
     bc
+  end
+
+  def set_neighbors
+    self.neighbors = Neighbor.new.find_neighbors(Neighbor.new.get_host, self.port, NEIGHBOR_IP_RANGE_START, NEIGHBOR_IP_RANGE_END, BLOCKCHAIN_PORT_RANGE_START, BLOCKCHAIN_PORT_RANGE_END)
+    p self.neighbors
+  end
+
+  def sync_neighbors
+    self.mux_neighbors.synchronize do
+      self.set_neighbors
+    end
+  end
+
+  def start_sync_neighbors
+    Thread.new { self.sync_neighbors }
+    sleep BLOCKCHAIN_NEIGHBOR_SYNC_TIME_SEC
+    start_sync_neighbors
   end
 
   def create_block(nonce, previous_hash)
