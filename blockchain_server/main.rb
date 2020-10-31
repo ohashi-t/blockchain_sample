@@ -6,13 +6,21 @@ require_relative '../block/transaction_request'
 
 $cache = {}
 
+module WEBrick
+  module HTTPServlet
+    class ProcHandler < AbstractServlet
+      alias do_PUT    do_GET
+      alias do_DELETE do_GET
+    end
+  end
+end
+
 srv = WEBrick::HTTPServer.new(
   DocumentRoot: './',
   BindAddress: "127.0.0.1",
   Port: ARGV[0],
 )
 # binding.pry
-BlockchainServer.new(srv.config[:Port]).get_blockchain.start_sync_neighbors
 
 srv.mount_proc("/") do |req, res|
   BlockchainServer.new(srv.config[:Port]).get_chain(req).each do |block_json|
@@ -46,6 +54,28 @@ srv.mount_proc("/transactions") do |req, res|
       res.status = 404
       res.body = "failed..."
     end
+  when "PUT"
+    t = B::TransactionRequest.new(JSON.parse(req.body))
+
+    if !t.validate?
+      res.status = 404
+      res.body = "params is invalid!"
+      return
+    end
+
+    bc = BlockchainServer.new(ARGV[0]).get_blockchain
+    is_updated = bc.add_transaction(t.sender_blockchain_address, t.recipient_blockchain_address, t.value, t.sender_public_key, t.signature)
+
+    if is_updated
+      res.status = 200
+      res.body = "success!!!!"
+    else
+      res.status = 404
+      res.body = "failed..."
+    end
+  when "DELETE"
+    bc = BlockchainServer.new(ARGV[0]).get_blockchain
+    bc.transaction_pool.clear
   else
     res.status = 404
     res.body = "Can't attached this connection."
@@ -89,4 +119,8 @@ srv.mount_proc("/amount") do |req, res|
   end
 end
 
+Thread.new { BlockchainServer.new(srv.config[:Port]).get_blockchain.start_sync_neighbors }
+
 srv.start
+
+

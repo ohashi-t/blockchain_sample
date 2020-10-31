@@ -7,7 +7,8 @@ require_relative '../utils/neighbor'
 class Blockchain
   require_relative 'block'
   require_relative 'transaction'
-
+  require_relative 'transaction_request'
+  require 'faraday'
 
   MINING_SENDER = "THE BLOCKCHAIN"
   MINING_REWARD = 1.0
@@ -61,6 +62,11 @@ class Blockchain
     b = Block.new(nonce, previous_hash, self.transaction_pool)
     self.chain << b
     self.transaction_pool.clear
+    self.neighbors.each do |n|
+      res = Faraday.delete("http://#{n}/transactions")
+      p res.body
+    end
+    b
   end
 
   def transaction_json
@@ -73,6 +79,19 @@ class Blockchain
 
   def create_transaction(sender, recipient, value, sender_public_key, signature)
     is_transacted = add_transaction(sender, recipient, value, sender_public_key, signature)
+    if is_transacted
+      self.neighbors.each do |n|
+        bt = B::TransactionRequest.new({
+                                 sender_blockchain_address: sender,
+                                 recipient_blockchain_address: recipient,
+                                 sender_public_key: sender_public_key,
+                                 signature: signature,
+                                 value: value
+                               }.transform_keys(&:to_s))
+        res = Faraday.put("http://#{n}/transactions", bt.attr_json)
+        p res.body
+      end
+    end
     is_transacted
   end
 

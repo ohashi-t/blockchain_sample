@@ -9,6 +9,16 @@ module B
       @signature = req["signature"]
     end
 
+    def attr_json
+      {
+        sender_blockchain_address: sender_blockchain_address,
+        recipient_blockchain_address: recipient_blockchain_address,
+        sender_public_key: sender_public_key,
+        value: value,
+        signature: signature
+      }.to_json
+    end
+
     def validate?
       if signature.nil? ||
         signature.empty? ||

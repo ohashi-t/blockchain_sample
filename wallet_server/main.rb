@@ -57,7 +57,6 @@ srv.mount_proc("/transaction") do |req, res|
       # p tr.recipient_blockchain_address
       # p tr.value
       # res.status = 200
-
       t = W::Transaction.new(tr.sender_private_key, tr.sender_public_key, tr.sender_blockchain_address, tr.recipient_blockchain_address, tr.value)
       response = Faraday.post("http://127.0.0.1:5000/transactions", t.send_json)
       if response.status == 201
