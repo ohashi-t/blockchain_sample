@@ -19,16 +19,17 @@ class Blockchain
   BLOCKCHAIN_PORT_RANGE_END = 5003
   NEIGHBOR_IP_RANGE_START = 0
   NEIGHBOR_IP_RANGE_END = 1
-  BLOCKCHAIN_NEIGHBOR_SYNC_TIME_SEC = 20
+  BLOCKCHAIN_NEIGHBOR_SYNC_TIME_SEC = 10
 
   attr_accessor :chain, :transaction_pool, :blockchain_address, :port, :mux, :neighbors, :mux_neighbors
 
-  def initialize(blockchain_address, port)
-    @chain = []
+  def initialize(reg)
+    reg.transform_keys!(&:to_sym)
+    @chain = reg[:chain] || []
     @transaction_pool = []
     # 誰がマイニングしたか
-    @blockchain_address = blockchain_address
-    @port = port
+    @blockchain_address = reg[:blockchain_address]
+    @port = reg[:port]
     @mux = Thread::Mutex.new
     @neighbors = []
     @mux_neighbors = Thread::Mutex.new
@@ -36,7 +37,7 @@ class Blockchain
 
   def self.new_blockchain(blockchain_address, port)
     b = Block.new(0, "Init hash", [])
-    bc = self.new(blockchain_address, port)
+    bc = self.new(blockchain_address: blockchain_address, port: port)
     bc.create_block(0, b.hashed)
     bc
   end
@@ -146,6 +147,11 @@ class Blockchain
       previous_hash = self.chain.last.hashed
       self.create_block(nonce, previous_hash)
       p "action=mining, status=success"
+
+      self.neighbors.each do |n|
+        p res = Faraday.put("http://#{n}/consensus")
+      end
+
       true
     end
   end
@@ -175,6 +181,45 @@ class Blockchain
     to_json
   end
 
+  def valid_chain?(ch)
+    pre_block = ch[0]
+    1.upto(ch.size - 1) do |current_index|
+      b = ch[current_index]
+      return false unless b.previous_hash == pre_block.hashed
+      return false unless self.valid_proof(b.nonce, b.previous_hash, b.transactions, MINING_DIFFICULTY)
+      pre_block = b
+    end
+    return true
+  end
+
+  def resolve_conflicts
+    longest_chain = nil
+    max_length = self.chain.size
+
+    self.neighbors.each do |n|
+      res = Faraday.get("http://#{n}")
+      if res.status == 200
+        # parsed_blocks = JSON.parse(res.body)
+        parsed_blocks = Marshal.load(Base64.decode64(res.body))
+        # resp_bc = Blockchain.new(chain: parsed_blocks.map{ |block| Block.new(block["nonce"], block["previous_hash"], block["transactions"], block["timestamp"]) })
+        resp_bc = Blockchain.new(chain: parsed_blocks.map{ |block| Block.new(block.nonce, block.previous_hash, block.transactions, block.timestamp) })
+        chain = resp_bc.chain
+        if chain.size > max_length && valid_chain?(chain)
+          max_length = chain.size
+          longest_chain = chain
+        end
+      end
+    end
+
+    if longest_chain
+      self.chain = longest_chain
+      p "Resolve conflicts replaced"
+      return true
+    end
+    p "Resolve conflicts not replaced"
+    return false
+  end
+
   def copy_transaction_pool
     self.transaction_pool.dup.map(&:dup)
   end
@@ -193,12 +238,11 @@ class Blockchain
       chain_json << {
                       nonce: block.nonce,
                       previous_hash: block.previous_hash,
-                      transactions: block.transactions,
+                      transactions: block.transactions.map(&:make_hash),
                       timestamp: block.timestamp
-                    }.
-                    to_json
+                    }
     end
-    chain_json
+    chain_json.to_json
   end
 
 end

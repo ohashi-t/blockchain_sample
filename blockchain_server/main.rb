@@ -23,9 +23,13 @@ srv = WEBrick::HTTPServer.new(
 # binding.pry
 
 srv.mount_proc("/") do |req, res|
-  BlockchainServer.new(srv.config[:Port]).get_chain(req).each do |block_json|
-    res.body << block_json
-  end
+  chain = BlockchainServer.new(srv.config[:Port]).get_blockchain.chain
+  res.body << Base64.encode64(Marshal.dump(chain))
+  res.content_type = "text/html"
+end
+
+srv.mount_proc("/chain") do |req, res|
+  res.body << BlockchainServer.new(srv.config[:Port]).get_chain(req)
   res.content_type = "application/json"
 end
 
@@ -119,7 +123,24 @@ srv.mount_proc("/amount") do |req, res|
   end
 end
 
+srv.mount_proc("/consensus") do |req, res|
+  case req.request_method
+  when "PUT"
+    bc = BlockchainServer.new(srv.config[:Port]).get_blockchain
+    replaced = bc.resolve_conflicts
+    res.body = replaced ? "success!!" : "failed..."
+    res.content_type = "application/json"
+  else
+    p "ERROR: Invalid HTTP Method"
+    res.status = 404
+  end
+end
+
 Thread.new { BlockchainServer.new(srv.config[:Port]).get_blockchain.start_sync_neighbors }
+Thread.new do
+  sleep 20
+  BlockchainServer.new(srv.config[:Port]).get_blockchain.resolve_conflicts
+end
 
 srv.start
 

@@ -10,7 +10,7 @@ class Neighbor
         Socket.tcp(host, port)
       end
     rescue
-      p "#{host}:#{port} err"
+      # p "#{host}:#{port} err"
       return false
     end
     true
