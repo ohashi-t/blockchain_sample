@@ -21,7 +21,7 @@ w = WalletServer.new(ARGV[0], ARGV[1])
 #   res.content_type = "text/html"
 # end
 
-srv.mount("/", WEBrick::HTTPServlet::FileHandler, "./templates/index.html")
+srv.mount("/", WEBrick::HTTPServlet::FileHandler, "./wallet_server/templates/index.html")
 
 srv.mount_proc("/wallet") do |req, res|
   case req.request_method
